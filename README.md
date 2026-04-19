@@ -18,6 +18,20 @@ A full-stack AI-powered GitHub repository scanner built with:
 - **React Dashboard** — Clean UI with live status, summary card, graphs panel, and repo cards
 - **Rich CLI** — Full terminal interface without the web UI
 
+## Screenshots
+
+### RepoScan Preview
+
+![RepoScan Preview](docs/screenshots/reposcan-hero.png)
+
+Add more UI screenshots in `docs/screenshots/` and reference them here, for example:
+
+```md
+![Home Dashboard](docs/screenshots/home-dashboard.png)
+![Repository Graphs](docs/screenshots/repository-graphs.png)
+![Summary + Risk Panel](docs/screenshots/summary-risk.png)
+```
+
 ## Quick Start
 
 ```bash
