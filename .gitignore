@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+.venv*/
+venv/
+venv*/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Runtime logs / temp
+*.log
+*.pid
+*.tmp
+*.swp
+.run/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Output
+output/
+reports/
+
+# Node / React
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+
+# IDE
+.vscode/
+.idea/
+*.DS_Store
