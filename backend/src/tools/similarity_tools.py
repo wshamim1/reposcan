@@ -9,7 +9,7 @@ from typing import Any
 from github import Github, GithubException
 from langchain_core.tools import tool
 
-from src.utils.helpers import parse_github_url
+from backend.src.utils.helpers import parse_github_url
 
 
 _STOPWORDS = {

@@ -21,6 +21,11 @@ export default function HomePage() {
   const [prefillUrl, setPrefillUrl] = useState('');
   const [compareOpen, setCompareOpen] = useState(false);
 
+  function handleRepoSelect(url, useCase = '', forceRefresh = false) {
+    setPrefillUrl(url);
+    submit(url, useCase, forceRefresh);
+  }
+
   function handleHistorySelect(url) {
     setPrefillUrl(url);
     submit(url, '', false);
@@ -47,66 +52,77 @@ export default function HomePage() {
 
       {/* Search */}
       <main className="main-content">
-        <div className="hero">
-          <h1>Analyze any GitHub repository in seconds</h1>
-          <p>Paste a GitHub URL and let the AI agent build a full report — summary, graphs, and similar repos.</p>
-          <SearchBar onSubmit={submit} loading={loading} prefillUrl={prefillUrl} />
-        </div>
-
-        {/* Scan History */}
-        <HistoryPanel onSelect={handleHistorySelect} />
-
-        {/* Status banner */}
-        {loading && STATUS_MESSAGES[status] && (
-          <div className="status-banner">
-            <span className="spinner" />
-            {STATUS_MESSAGES[status]}
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="error-banner">
-            ❌ {error}
-          </div>
-        )}
-
-        {/* Results */}
-        {scan && (
-          <>
-            {/* Export / Share bar */}
-            <ExportShare scan={scan} />
-
-            <div className="results">
-              {/* 1. Summary + Getting Started + Stats */}
-              <SummaryCard scan={scan} />
-
-              {/* 2. Graphs */}
-              <GraphsPanel graphs={scan.graphs} />
-
-              {/* 3. Dependencies */}
-              <DependenciesPanel dependencies={scan.dependencies} />
-
-              {/* 4. CI/CD */}
-              <CicdPanel cicd={scan.cicd} />
-
-              {/* 5. Risk Flags */}
-              {scan.risk_flags?.length > 0 && (
-                <section className="card risk-card">
-                  <h2 className="section-title">⚠️ Risk Flags</h2>
-                  <ul className="risk-list">
-                    {scan.risk_flags.map((flag, i) => (
-                      <li key={i} className="risk-item">{flag}</li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              {/* 6. Similar Repos */}
-              <SimilarRepos repos={scan.similar_repos} clusters={scan.similar_repo_clusters} />
+        <div className="dashboard-layout">
+          <aside className="left-column">
+            <div className="hero">
+              <h1>Analyze any GitHub repository in seconds</h1>
+              <p>Paste a GitHub URL or search by keywords, pick a repo, and let the AI agent build a full report.</p>
+              <SearchBar onSubmit={submit} onSelectUrl={handleRepoSelect} loading={loading} prefillUrl={prefillUrl} />
             </div>
-          </>
-        )}
+
+            {/* Scan History */}
+            <HistoryPanel onSelect={handleHistorySelect} />
+          </aside>
+
+          <section className="right-column">
+            {/* Status banner */}
+            {loading && STATUS_MESSAGES[status] && (
+              <div className="status-banner">
+                <span className="spinner" />
+                {STATUS_MESSAGES[status]}
+              </div>
+            )}
+
+            {/* Error */}
+            {error && (
+              <div className="error-banner">
+                ❌ {error}
+              </div>
+            )}
+
+            {/* Results */}
+            {scan ? (
+              <>
+                {/* Export / Share bar */}
+                <ExportShare scan={scan} />
+
+                <div className="results">
+                  {/* 1. Summary + Getting Started + Stats */}
+                  <SummaryCard scan={scan} />
+
+                  {/* 2. Graphs */}
+                  <GraphsPanel graphs={scan.graphs} />
+
+                  {/* 3. Dependencies */}
+                  <DependenciesPanel dependencies={scan.dependencies} />
+
+                  {/* 4. CI/CD */}
+                  <CicdPanel cicd={scan.cicd} />
+
+                  {/* 5. Risk Flags */}
+                  {scan.risk_flags?.length > 0 && (
+                    <section className="card risk-card">
+                      <h2 className="section-title">⚠️ Risk Flags</h2>
+                      <ul className="risk-list">
+                        {scan.risk_flags.map((flag, i) => (
+                          <li key={i} className="risk-item">{flag}</li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  {/* 6. Similar Repos */}
+                  <SimilarRepos repos={scan.similar_repos} clusters={scan.similar_repo_clusters} />
+                </div>
+              </>
+            ) : (
+              <section className="card results-placeholder">
+                <h2 className="section-title">Ready for Results</h2>
+                <p>Select a repository on the left to see the full analysis on this panel.</p>
+              </section>
+            )}
+          </section>
+        </div>
       </main>
 
       <footer className="site-footer">

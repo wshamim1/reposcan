@@ -28,6 +28,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from github import Github, GithubException
 
 load_dotenv()
 
@@ -161,8 +162,8 @@ def _run_scan(
             cache_reason = "Fresh scan completed because repository update timestamp could not be verified."
 
         logger.info(f"[{job_id}] Importing scanner agent...")
-        from src.agents.scanner_agent import scan_repository
-        from src.graphs.repo_visualizer import build_all_graphs
+        from backend.src.agents.scanner_agent import scan_repository
+        from backend.src.graphs.repo_visualizer import build_all_graphs
 
         logger.info(f"[{job_id}] Running scan_repository...")
         result = scan_repository(github_url, verbose=verbose, use_case=use_case)
@@ -222,7 +223,7 @@ def _save_scan_cache(cache_data: dict[str, Any]) -> None:
 
 def _get_repo_updated_at(github_url: str) -> tuple[str | None, dict[str, Any] | None]:
     try:
-        from src.tools.github_tools import get_repo_info
+        from backend.src.tools.github_tools import get_repo_info
 
         repo_info = get_repo_info.invoke(github_url)
         if isinstance(repo_info, dict):
@@ -285,13 +286,13 @@ async def get_graphs(github_url: str) -> dict:
     Fetch raw GitHub data and generate Plotly graphs WITHOUT the LLM agent.
     Fast — uses only GitHub API calls, no OpenAI cost.
     """
-    from src.tools.github_tools import (
+    from backend.src.tools.github_tools import (
         get_repo_info,
         get_language_breakdown,
         get_contributors,
         get_commit_activity,
     )
-    from src.graphs.repo_visualizer import build_all_graphs
+    from backend.src.graphs.repo_visualizer import build_all_graphs
 
     if not github_url.strip():
         raise HTTPException(status_code=400, detail="github_url is required")
@@ -318,7 +319,7 @@ async def get_graphs(github_url: str) -> dict:
 @app.get("/api/similar")
 async def get_similar(github_url: str) -> dict:
     """Find similar repositories for the given GitHub URL."""
-    from src.tools.similarity_tools import find_similar_repos
+    from backend.src.tools.similarity_tools import find_similar_repos
 
     if not github_url.strip():
         raise HTTPException(status_code=400, detail="github_url is required")
@@ -329,6 +330,40 @@ async def get_similar(github_url: str) -> dict:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return {"similar_repos": similar}
+
+
+@app.get("/api/search-repos")
+async def search_repos(keywords: str, limit: int = 8) -> dict:
+    """Search public GitHub repositories by keywords."""
+    query = (keywords or "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="keywords is required")
+
+    safe_limit = max(1, min(limit, 20))
+    token = os.getenv("GITHUB_TOKEN")
+    gh = Github(token) if token else Github()
+
+    try:
+        repos = gh.search_repositories(
+            query=f"{query} in:name,description,readme",
+            sort="stars",
+            order="desc",
+        )
+        results = []
+        for repo in repos[:safe_limit]:
+            results.append(
+                {
+                    "full_name": repo.full_name,
+                    "description": repo.description or "",
+                    "stars": repo.stargazers_count,
+                    "language": repo.language or "Unknown",
+                    "html_url": repo.html_url,
+                }
+            )
+    except GithubException as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {"query": query, "results": results}
 
 
 @app.get("/api/history")
@@ -352,6 +387,27 @@ async def get_history() -> dict:
     # Most recently scanned first
     history.sort(key=lambda x: x.get("scanned_at", ""), reverse=True)
     return {"history": history}
+
+
+@app.delete("/api/history")
+async def delete_history(github_url: str | None = None) -> dict:
+    """Delete one cached history entry by URL, or clear all history when URL is omitted."""
+    cache = _load_scan_cache()
+
+    if github_url is None:
+        _save_scan_cache({})
+        return {"deleted": "all", "remaining": 0}
+
+    key = github_url.strip().lower()
+    if not key:
+        raise HTTPException(status_code=400, detail="github_url must not be empty")
+
+    if key not in cache:
+        raise HTTPException(status_code=404, detail="History entry not found")
+
+    del cache[key]
+    _save_scan_cache(cache)
+    return {"deleted": key, "remaining": len(cache)}
 
 
 @app.post("/api/execute-script")

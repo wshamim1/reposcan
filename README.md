@@ -101,7 +101,17 @@ reposcan/
 ├── requirements.txt
 ├── .env.example
 ├── backend/
-│   └── main.py              # FastAPI app (CORS, /api/scan, /api/graphs, /api/similar)
+│   ├── main.py              # FastAPI app (CORS, /api/scan, /api/graphs, /api/similar)
+│   └── src/
+│       ├── agents/
+│       │   └── scanner_agent.py # LangChain ReAct agent
+│       ├── tools/
+│       │   ├── github_tools.py  # GitHub API tools (repo info, commits, structure…)
+│       │   └── similarity_tools.py # Similar repo search tool
+│       ├── graphs/
+│       │   └── repo_visualizer.py  # Plotly graph generation
+│       └── utils/
+│           └── helpers.py       # URL parsing, formatting helpers
 ├── frontend/                # React + Vite
 │   ├── src/
 │   │   ├── App.jsx
@@ -114,16 +124,6 @@ reposcan/
 │   │   ├── hooks/useScan.js      # async polling hook
 │   │   └── utils/api.js          # axios API calls
 │   └── vite.config.js            # proxy /api → :8000
-├── src/
-│   ├── agents/
-│   │   └── scanner_agent.py # LangChain ReAct agent
-│   ├── tools/
-│   │   ├── github_tools.py  # GitHub API tools (repo info, commits, structure…)
-│   │   └── similarity_tools.py # Similar repo search tool
-│   ├── graphs/
-│   │   └── repo_visualizer.py  # Plotly graph generation
-│   └── utils/
-│       └── helpers.py       # URL parsing, formatting helpers
 └── output/                  # CLI graph output (JSON)
 ```
 

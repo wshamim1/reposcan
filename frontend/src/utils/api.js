@@ -57,6 +57,28 @@ export async function fetchHistory() {
   return data;
 }
 
+/** Delete one history item by GitHub URL. */
+export async function deleteHistoryEntry(githubUrl) {
+  const { data } = await api.delete('/api/history', {
+    params: { github_url: githubUrl },
+  });
+  return data;
+}
+
+/** Clear all history entries. */
+export async function clearHistory() {
+  const { data } = await api.delete('/api/history');
+  return data;
+}
+
+/** Search GitHub repos by keywords. */
+export async function searchRepos(keywords, limit = 8) {
+  const { data } = await api.get('/api/search-repos', {
+    params: { keywords, limit },
+  });
+  return data;
+}
+
 /** Execute a setup script from UI (backend executes in controlled shell). */
 export async function executeSetupScript(script, timeoutSeconds = 90, workingDir = null) {
   const { data } = await api.post('/api/execute-script', {

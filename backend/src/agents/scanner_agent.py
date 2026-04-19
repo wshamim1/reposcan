@@ -14,7 +14,7 @@ from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 
-from src.tools.github_tools import (
+from backend.src.tools.github_tools import (
   ALL_GITHUB_TOOLS,
   get_commit_activity,
   get_contributors,
@@ -26,7 +26,7 @@ from src.tools.github_tools import (
   get_dependencies,
   get_cicd_info,
 )
-from src.tools.similarity_tools import ALL_SIMILARITY_TOOLS, find_similar_repos
+from backend.src.tools.similarity_tools import ALL_SIMILARITY_TOOLS, find_similar_repos
 
 load_dotenv()
 
@@ -129,6 +129,72 @@ _PROMPT = PromptTemplate.from_template(_REACT_TEMPLATE)
 
 ALL_TOOLS = ALL_GITHUB_TOOLS + ALL_SIMILARITY_TOOLS
 
+_NOISY_TECH_TOKENS = {
+    "url",
+    "urls",
+    "http",
+    "https",
+    "text",
+    "plain text",
+    "markdown",
+    "md",
+    "unknown",
+    "none",
+    "n/a",
+}
+
+
+def _clean_text_fragment(text: str) -> str:
+    """Normalize README/description snippets into readable plain text."""
+    if not text:
+        return ""
+
+    cleaned = text
+    # Remove HTML tags.
+    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+    # Replace markdown links/images with their human text.
+    cleaned = re.sub(r"!\[([^\]]*)\]\([^\)]*\)", r"\1", cleaned)
+    cleaned = re.sub(r"\[([^\]]+)\]\([^\)]*\)", r"\1", cleaned)
+    # Remove inline code markers/backticks.
+    cleaned = cleaned.replace("`", "")
+    # Remove markdown emphasis markers.
+    cleaned = re.sub(r"[*_]{1,3}", "", cleaned)
+    # Collapse whitespace.
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    # Remove common sentence-fragment tails.
+    cleaned = cleaned.rstrip(":;,- ")
+    return cleaned
+
+
+def _normalize_tech_stack(raw_stack: list[str]) -> list[str]:
+    """Drop noisy pseudo-technologies and keep unique readable labels."""
+    cleaned: list[str] = []
+    seen: set[str] = set()
+
+    for item in raw_stack or []:
+        value = _clean_text_fragment(str(item))
+        if not value:
+            continue
+        lowered = value.lower()
+        if lowered in _NOISY_TECH_TOKENS:
+            continue
+        if lowered.startswith("http"):
+            continue
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        cleaned.append(value)
+
+    return cleaned[:8]
+
+
+def _first_sentence(text: str) -> str:
+    cleaned = _clean_text_fragment(text)
+    if not cleaned:
+        return ""
+    parts = re.split(r"(?<=[.!?])\s+", cleaned)
+    return parts[0].strip()
+
 
 def _extract_readme_intro(readme: str) -> str:
     if not readme or readme.startswith("Error:"):
@@ -148,7 +214,14 @@ def _extract_readme_intro(readme: str) -> str:
             continue
         if ln.startswith("[!"):
             continue
-        current.append(ln)
+        if "shields.io" in ln.lower() or "img.shields.io" in ln.lower():
+            continue
+
+        cleaned = _clean_text_fragment(ln)
+        if not cleaned:
+            continue
+
+        current.append(cleaned)
         if len(" ".join(current)) > 280:
             paragraphs.append(" ".join(current).strip())
             break
@@ -315,14 +388,19 @@ def _compose_fallback_summary(
     getting_started: list[str],
 ) -> str:
     name = repo.get("full_name") or repo.get("name") or "This repository"
-    description = (repo.get("description") or "").strip()
+    description = _clean_text_fragment((repo.get("description") or "").strip())
+    readme_intro = _clean_text_fragment(readme_intro)
+    tech_stack = _normalize_tech_stack(tech_stack)
 
     parts: list[str] = []
 
     if description:
-        parts.append(f"{name} is {description.rstrip('.')}." )
+        parts.append(f"{name} is {description.rstrip('.')}.")
     elif readme_intro:
-        parts.append(f"{name} focuses on {readme_intro.rstrip('.')}." )
+        if readme_intro.lower().startswith("this repository"):
+            parts.append(f"{name}: {readme_intro.rstrip('.')}.")
+        else:
+            parts.append(f"{name} focuses on {readme_intro.rstrip('.')}.")
     else:
         parts.append(f"{name} provides project assets and implementation code for its domain use case.")
 
@@ -330,7 +408,10 @@ def _compose_fallback_summary(
         top_stack = ", ".join(tech_stack[:4])
         parts.append(f"The primary technologies appear to be {top_stack}.")
 
-    if readme_intro and readme_intro.lower() not in (description or "").lower():
+    desc_l = description.lower()
+    intro_l = readme_intro.lower()
+    is_duplicate = bool(desc_l and intro_l and (intro_l in desc_l or desc_l in intro_l))
+    if readme_intro and not is_duplicate:
         parts.append(f"At a high level, {readme_intro.rstrip('.')}." )
 
     if getting_started:
@@ -774,20 +855,26 @@ def _fallback_scan_from_tools(
             )
             if getting_started:
                 getting_started_source = "generated"
+        normalized_stack = _normalize_tech_stack(
+            list(language_breakdown.keys()) if isinstance(language_breakdown, dict) else []
+        )
+
         fallback_summary = _compose_fallback_summary(
             repo=repo if isinstance(repo, dict) else {},
             readme_intro=readme_intro,
-            tech_stack=list(language_breakdown.keys())[:8] if isinstance(language_breakdown, dict) else [],
+            tech_stack=normalized_stack,
             getting_started=getting_started,
         )
+
+        purpose_text = _first_sentence(description or readme_intro)
 
         result = {
             "repo": repo if isinstance(repo, dict) else {},
             "summary": fallback_summary,
-            "purpose": (description or readme_intro or "N/A"),
+            "purpose": (purpose_text or "N/A"),
             "getting_started": getting_started,
             "getting_started_source": getting_started_source,
-            "tech_stack": list(language_breakdown.keys())[:8] if isinstance(language_breakdown, dict) else [],
+            "tech_stack": normalized_stack,
             "key_features": [],
             "activity": activity,
             "readme": readme_text,

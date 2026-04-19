@@ -101,7 +101,7 @@ def scan(github_url: str, verbose: bool, json_out: bool) -> None:
     _require_env("OPENAI_API_KEY")
 
     console.print(f"\n[bold cyan]Scanning[/] {github_url} …\n")
-    from src.agents.scanner_agent import scan_repository
+    from backend.src.agents.scanner_agent import scan_repository
 
     with console.status("[bold green]Agent working…"):
         result = scan_repository(github_url, verbose=verbose)
@@ -118,10 +118,10 @@ def graphs(github_url: str) -> None:
     """Generate Plotly graphs for GITHUB_URL (no LLM needed)."""
 
     console.print(f"\n[bold cyan]Fetching data for[/] {github_url} …")
-    from src.tools.github_tools import (
+    from backend.src.tools.github_tools import (
         get_repo_info, get_language_breakdown, get_contributors, get_commit_activity,
     )
-    from src.graphs.repo_visualizer import build_all_graphs
+    from backend.src.graphs.repo_visualizer import build_all_graphs
     import pathlib
 
     repo_info = get_repo_info.invoke(github_url)
@@ -151,7 +151,7 @@ def similar(github_url: str) -> None:
     """Find similar repositories for GITHUB_URL."""
 
     console.print(f"\n[bold cyan]Finding similar repos for[/] {github_url} …")
-    from src.tools.similarity_tools import find_similar_repos
+    from backend.src.tools.similarity_tools import find_similar_repos
 
     with console.status("Searching…"):
         repos = find_similar_repos.invoke(github_url)
