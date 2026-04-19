@@ -20,17 +20,17 @@ A full-stack AI-powered GitHub repository scanner built with:
 
 ## Screenshots
 
-### RepoScan Preview
+### Home + Scan History
 
-![RepoScan Preview](docs/screenshots/reposcan-hero.png)
+![Home + Scan History](docs/screenshots/home-scan-history.png)
 
-Add more UI screenshots in `docs/screenshots/` and reference them here, for example:
+### Repository Summary + Graphs
 
-```md
-![Home Dashboard](docs/screenshots/home-dashboard.png)
-![Repository Graphs](docs/screenshots/repository-graphs.png)
-![Summary + Risk Panel](docs/screenshots/summary-risk.png)
-```
+![Repository Summary + Graphs](docs/screenshots/summary-graph.png)
+
+Current placeholder image:
+
+![RepoScan Placeholder](docs/screenshots/reposcan-hero.png)
 
 ## Quick Start
 
