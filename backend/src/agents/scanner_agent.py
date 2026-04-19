@@ -161,6 +161,7 @@ def _clean_text_fragment(text: str) -> str:
     cleaned = re.sub(r"[*_]{1,3}", "", cleaned)
     # Collapse whitespace.
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = re.sub(r"\s+([.,!?;:])", r"\1", cleaned)
     # Remove common sentence-fragment tails.
     cleaned = cleaned.rstrip(":;,- ")
     return cleaned
@@ -196,6 +197,29 @@ def _first_sentence(text: str) -> str:
     return parts[0].strip()
 
 
+def _normalize_intro_text(text: str) -> str:
+    """Remove awkward trailing fragments such as 'It includes.' from README intros."""
+    cleaned = _clean_text_fragment(text)
+    if not cleaned:
+        return ""
+
+    cleaned = re.sub(
+        r"\b(?:it\s+)?(?:includes|contains|features|provides|offers)\.?$",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    ).strip(" .,:;-")
+    return cleaned
+
+
+def _strip_repo_self_reference(text: str) -> str:
+    """Convert 'This repository is ...' into a neutral phrase for better sentence flow."""
+    if not text:
+        return ""
+    cleaned = text.strip()
+    return re.sub(r"^this repository\s+(is|focuses on)\s+", "", cleaned, flags=re.IGNORECASE)
+
+
 def _extract_readme_intro(readme: str) -> str:
     if not readme or readme.startswith("Error:"):
         return ""
@@ -227,7 +251,8 @@ def _extract_readme_intro(readme: str) -> str:
             break
     if current and not paragraphs:
         paragraphs.append(" ".join(current).strip())
-    return paragraphs[0][:320] if paragraphs else ""
+    intro = paragraphs[0][:320] if paragraphs else ""
+    return _normalize_intro_text(intro)
 
 
 def _extract_getting_started(readme: str) -> list[str]:
@@ -389,18 +414,21 @@ def _compose_fallback_summary(
 ) -> str:
     name = repo.get("full_name") or repo.get("name") or "This repository"
     description = _clean_text_fragment((repo.get("description") or "").strip())
-    readme_intro = _clean_text_fragment(readme_intro)
+    readme_intro = _normalize_intro_text(readme_intro)
     tech_stack = _normalize_tech_stack(tech_stack)
 
     parts: list[str] = []
+    used_intro_as_lead = False
 
     if description:
         parts.append(f"{name} is {description.rstrip('.')}.")
     elif readme_intro:
-        if readme_intro.lower().startswith("this repository"):
-            parts.append(f"{name}: {readme_intro.rstrip('.')}.")
+        intro_body = _strip_repo_self_reference(readme_intro).rstrip(".")
+        if intro_body:
+            parts.append(f"{name} is {intro_body}.")
+            used_intro_as_lead = True
         else:
-            parts.append(f"{name} focuses on {readme_intro.rstrip('.')}.")
+            parts.append(f"{name} provides project assets and implementation code for its domain use case.")
     else:
         parts.append(f"{name} provides project assets and implementation code for its domain use case.")
 
@@ -411,7 +439,7 @@ def _compose_fallback_summary(
     desc_l = description.lower()
     intro_l = readme_intro.lower()
     is_duplicate = bool(desc_l and intro_l and (intro_l in desc_l or desc_l in intro_l))
-    if readme_intro and not is_duplicate:
+    if readme_intro and not used_intro_as_lead and not is_duplicate:
         parts.append(f"At a high level, {readme_intro.rstrip('.')}." )
 
     if getting_started:
